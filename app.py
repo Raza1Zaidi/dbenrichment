@@ -9,12 +9,12 @@ import os
 # ===============================
 DUCKDB_FILE_ID = "16rZDqCd8PQjrHVJnXjDKGM__kD83Cajd"
 DUCKDB_LOCAL_PATH = "/tmp/bd_companies.duckdb"
-ALLOWED_EMAIL_DOMAIN = "@12252025trypecter.com"
+ALLOWED_EMAIL_DOMAIN = "@tryspecter.com"
 
 # ===============================
 # EMAIL GATE
 # ===============================
-st.title("BD Domain Matcher")
+st.title("LinkedIn Domain Enrichment")
 
 email = st.text_input("Enter your work email to continue")
 
@@ -26,14 +26,30 @@ if not email.lower().endswith(ALLOWED_EMAIL_DOMAIN):
     st.stop()
 
 # ===============================
-# LOAD DUCKDB (SAFE FOR DRIVE)
+# SAFE DUCKDB LOADER
 # ===============================
 @st.cache_resource
 def load_db():
+    # If file exists but is small, it's invalid → delete it
+    if os.path.exists(DUCKDB_LOCAL_PATH):
+        if os.path.getsize(DUCKDB_LOCAL_PATH) < 100 * 1024 * 1024:  # <100MB = wrong
+            os.remove(DUCKDB_LOCAL_PATH)
+
+    # Download if missing
     if not os.path.exists(DUCKDB_LOCAL_PATH):
-        with st.spinner("Downloading database (first run only)…"):
-            url = f"https://drive.google.com/uc?id={DUCKDB_FILE_ID}"
-            gdown.download(url, DUCKDB_LOCAL_PATH, quiet=False)
+        with st.spinner("Downloading database (first run only, ~2.6GB)…"):
+            url = f"https://drive.google.com/file/d/{DUCKDB_FILE_ID}/view"
+            gdown.download(
+                url=url,
+                output=DUCKDB_LOCAL_PATH,
+                quiet=False,
+                fuzzy=True
+            )
+
+    # Final safety check
+    size_gb = os.path.getsize(DUCKDB_LOCAL_PATH) / (1024**3)
+    if size_gb < 1.0:
+        raise RuntimeError("Downloaded file is not a valid DuckDB database.")
 
     return duckdb.connect(DUCKDB_LOCAL_PATH, read_only=True)
 
@@ -45,7 +61,7 @@ con = load_db()
 st.subheader("Upload domains CSV")
 
 uploaded_file = st.file_uploader(
-    "Upload CSV (single column, domains only)",
+    "Upload CSV (single column: domains)",
     type=["csv"]
 )
 
@@ -55,6 +71,7 @@ if not uploaded_file:
 domains_df = pd.read_csv(uploaded_file, header=None)
 domains_df.columns = ["domain"]
 
+# Clean domains (exactly like your internal logic)
 domains_df["domain"] = (
     domains_df["domain"]
     .astype(str)
@@ -66,7 +83,7 @@ domains_df["domain"] = (
 con.register("input_domains", domains_df)
 
 # ===============================
-# QUERY (IDENTICAL TO YOUR LOGIC)
+# QUERY (IDENTICAL LOGIC)
 # ===============================
 st.info("Running domain match…")
 
@@ -80,7 +97,6 @@ ON c.derived_domain = d.domain
 result_df = con.execute(query).fetchdf()
 
 st.success(f"Matched rows: {len(result_df)}")
-
 st.dataframe(result_df.head(100))
 
 # ===============================
