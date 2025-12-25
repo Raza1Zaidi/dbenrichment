@@ -55,7 +55,7 @@ body {
 # =====================================================
 DUCKDB_FILE_ID = "16rZDqCd8PQjrHVJnXjDKGM__kD83Cajd"
 DUCKDB_LOCAL_PATH = "/tmp/bd_companies.duckdb"
-ALLOWED_EMAIL_DOMAIN = "@tryspecter.com"
+ALLOWED_EMAIL_DOMAIN = "@12252025tryspecter.com"
 
 # =====================================================
 # HEADER
