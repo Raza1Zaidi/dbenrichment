@@ -1,7 +1,7 @@
 import streamlit as st
 import duckdb
 import pandas as pd
-import requests
+import gdown
 import os
 
 # ===============================
@@ -26,24 +26,21 @@ if not email.lower().endswith(ALLOWED_EMAIL_DOMAIN):
     st.stop()
 
 # ===============================
-# DOWNLOAD DUCKDB FILE (ONCE)
+# LOAD DUCKDB (SAFE FOR DRIVE)
 # ===============================
 @st.cache_resource
 def load_db():
     if not os.path.exists(DUCKDB_LOCAL_PATH):
-        url = f"https://drive.google.com/uc?id={DUCKDB_FILE_ID}&export=download"
-        with st.spinner("Loading database… (first time only)"):
-            r = requests.get(url, stream=True)
-            with open(DUCKDB_LOCAL_PATH, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1024 * 1024):
-                    f.write(chunk)
+        with st.spinner("Downloading database (first run only)…"):
+            url = f"https://drive.google.com/uc?id={DUCKDB_FILE_ID}"
+            gdown.download(url, DUCKDB_LOCAL_PATH, quiet=False)
 
     return duckdb.connect(DUCKDB_LOCAL_PATH, read_only=True)
 
 con = load_db()
 
 # ===============================
-# UI — DOMAIN UPLOAD
+# UPLOAD DOMAINS
 # ===============================
 st.subheader("Upload domains CSV")
 
@@ -58,7 +55,6 @@ if not uploaded_file:
 domains_df = pd.read_csv(uploaded_file, header=None)
 domains_df.columns = ["domain"]
 
-# clean domains (same as your script)
 domains_df["domain"] = (
     domains_df["domain"]
     .astype(str)
@@ -70,7 +66,7 @@ domains_df["domain"] = (
 con.register("input_domains", domains_df)
 
 # ===============================
-# QUERY (IDENTICAL LOGIC)
+# QUERY (IDENTICAL TO YOUR LOGIC)
 # ===============================
 st.info("Running domain match…")
 
@@ -90,11 +86,9 @@ st.dataframe(result_df.head(100))
 # ===============================
 # DOWNLOAD
 # ===============================
-csv = result_df.to_csv(index=False).encode("utf-8")
-
 st.download_button(
     "Download full matched CSV",
-    csv,
+    result_df.to_csv(index=False).encode("utf-8"),
     "matched_domains.csv",
     "text/csv"
 )
